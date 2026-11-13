@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shop Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--text:#1b1e27;--muted:#69707d;--line:#e4e7ec;--accent:#4f46e5;--good:#059669;--bad:#dc2626;
+--c1:#4f46e5;--c2:#06b6d4;--c3:#f59e0b;--c4:#ec4899;--c5:#10b981;--c6:#8b5cf6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101217;--card:#1a1d25;--text:#e9ebf0;--muted:#98a0ad;--line:#2b2f3a;--accent:#818cf8;--good:#34d399;--bad:#f87171;--c1:#818cf8;--c2:#22d3ee;--c3:#fbbf24;--c4:#f472b6;--c5:#34d399;--c6:#a78bfa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101217;--card:#1a1d25;--text:#e9ebf0;--muted:#98a0ad;--line:#2b2f3a;--accent:#818cf8;--good:#34d399;--bad:#f87171;--c1:#818cf8;--c2:#22d3ee;--c3:#fbbf24;--c4:#f472b6;--c5:#34d399;--c6:#a78bfa;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:18px}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{font-size:20px;margin:0}.sub{color:var(--muted);font-size:12px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,input{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;color:var(--muted);background:var(--card);border:0;padding:7px 12px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:26px;font-weight:700;margin:4px 0 2px}
+.d.up{color:var(--good)}.d.down{color:var(--bad)}.d.na{color:var(--muted)}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:820px){.grid,.grid2{grid-template-columns:1fr}}
+h2{font-size:14px;margin:0 0 10px}
+.chart{position:relative;height:260px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px}th[data-k]{cursor:pointer}
+td.n,th.n{text-align:right}
+.badge{padding:2px 8px;border-radius:99px;font-size:11px;background:color-mix(in srgb,var(--muted) 18%,transparent)}
+.badge.delivered{color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)}
+.badge.returned,.badge.cancelled{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent)}
+.hint{color:var(--muted);font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>📊 Shop Analytics</h1><div class="sub">Sample data · 1,400 generated orders · as of Nov 12, 2026</div></div>
+  <div class="filters">
+    <div class="seg" id="range"><button data-r="30">30d</button><button data-r="90" class="on">90d</button><button data-r="180">6m</button><button data-r="400">All</button></div>
+    <select id="cat"></select><select id="region"></select>
+  </div>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="grid">
+  <div class="card"><h2 id="trendTitle">Revenue &amp; orders</h2><div class="chart"><canvas id="trend"></canvas></div></div>
+  <div class="card"><h2>Order status</h2><div class="chart"><canvas id="status"></canvas></div></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h2>Revenue by category</h2><div class="chart"><canvas id="catChart"></canvas></div><div class="hint">Click a bar to filter by that category.</div></div>
+  <div class="card"><h2>Top products</h2><div class="scroll"><table id="top"></table></div></div>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    <h2 style="margin:0">Recent orders</h2><input id="search" placeholder="Search order, product, region…">
+  </div>
+  <div class="scroll"><table id="orders"></table></div>
+</div>
+</div>
+
+<script>
+/* ---------- Sample data (seeded, deterministic) ---------- */
+let seed=42;const rnd=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
+const END=new Date('2026-11-12T12:00:00'),DAY=864e5;
+const CATS={Electronics:[['Wireless Earbuds',79],['Smart Watch',199],['Bluetooth Speaker',59],['Power Bank',35]],
+Home:[['Air Fryer',89],['Desk Lamp',29],['Coffee Maker',69],['Throw Blanket',39]],
+Fashion:[['Running Shoes',95],['Denim Jacket',85],['Backpack',55],['Sunglasses',45]],
+Beauty:[['Skincare Set',65],['Hair Dryer',75],['Perfume',90]],
+Sports:[['Yoga Mat',32],['Dumbbell Set',120],['Water Bottle',22]]};
+const REGIONS=['North America','Europe','Asia Pacific','Latin America','Middle East'],RW=[.38,.27,.2,.1,.05];
+const CHANNELS=['Organic','Paid ads','Email','Social'];
+const pick=(a,w)=>{let r=rnd(),i=0;if(!w)return a[Math.floor(r*a.length)];for(;i<a.length-1&&(r-=w[i])>0;i++);return a[i]};
+let orders=[];
+for(let i=0;i<1400;i++){
+  const cat=pick(Object.keys(CATS)),[product,price]=pick(CATS[cat]),qty=1+Math.floor(rnd()*rnd()*3.2);
+  const ago=Math.pow(rnd(),1.4)*365,date=new Date(END-ago*DAY);
+  const r=rnd();let status=r<.06?'returned':r<.1?'cancelled':'delivered';
+  if(ago<2&&status==='delivered')status=rnd()<.5?'processing':'shipped';else if(ago<6&&status==='delivered'&&rnd()<.3)status='shipped';
+  orders.push({date,cat,product,qty,total:Math.round(price*qty*(.92+rnd()*.12)),region:pick(REGIONS,RW),channel:pick(CHANNELS),status});
+}
+orders.sort((a,b)=>b.date-a.date);orders.forEach((o,i)=>o.id='#'+(10000+orders.length-i));
+const valid=o=>o.status!=='cancelled'&&o.status!=='returned';
+
+/* ---------- State & helpers ---------- */
+const st={range:90,cat:'all',region:'all',q:'',sort:'date',dir:-1};
+const $=id=>document.getElementById(id);
+const usd=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ago=o=>(END-o.date)/DAY;
+const fmtDate=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+function stats(l){const v=l.filter(valid),rev=v.reduce((s,o)=>s+o.total,0);
+  return{rev,n:l.length,aov:v.length?rev/v.length:0,ret:l.length?l.filter(o=>o.status==='returned').length/l.length:0}}
+
+$('cat').innerHTML='<option value="all">All categories</option>'+Object.keys(CATS).map(c=>`<option>${c}</option>`).join('');
+$('region').innerHTML='<option value="all">All regions</option>'+REGIONS.map(c=>`<option>${c}</option>`).join('');
+$('cat').onchange=e=>{st.cat=e.target.value;render()};
+$('region').onchange=e=>{st.region=e.target.value;render()};
+$('search').oninput=e=>{st.q=e.target.value.toLowerCase();renderOrders()};
+$('range').onclick=e=>{const b=e.target.closest('button');if(!b)return;st.range=+b.dataset.r;
+  [...$('range').children].forEach(x=>x.classList.toggle('on',x===b));render()};
+
+/* ---------- Charts ---------- */
+let charts={};
+function baseOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:css('--muted'),boxWidth:12}}}}}
+function axes(extra={}){const t={color:css('--muted')},g={color:css('--line')};
+  return{x:{ticks:{...t,maxTicksLimit:8},grid:{display:false}},y:{ticks:t,grid:g,beginAtZero:true},...extra}}
+function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart($(id),cfg)}
+
+function bucket(o,g){const d=new Date(o.date);
+  if(g==='month')return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(g==='week')d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const label=(k,g)=>{const[p,m,d]=k.split('-');const mo=new Date(+p,+m-1,d||1).toLocaleDateString('en-US',d?{month:'short',day:'numeric'}:{month:'short',year:'2-digit'});return mo}
+
+/* ---------- Render ---------- */
+function render(){
+  const R=st.range;
+  const base=orders.filter(o=>(st.cat==='all'||o.cat===st.cat)&&(st.region==='all'||o.region===st.region));
+  const cur=base.filter(o=>ago(o)<R),prev=base.filter(o=>ago(o)>=R&&ago(o)<2*R);
+  const a=stats(cur),b=stats(prev);
+
+  const defs=[['Revenue',usd(a.rev),a.rev,b.rev,1],['Orders',a.n.toLocaleString(),a.n,b.n,1],
+    ['Avg. order value',usd(a.aov),a.aov,b.aov,1],['Return rate',(a.ret*100).toFixed(1)+'%',a.ret,b.ret,-1]];
+  $('kpis').innerHTML=defs.map(([l,v,c,p,dir])=>{
+    let d='<span class="d na">no prior period</span>';
+    if(prev.length&&p){const ch=(c-p)/p,good=ch*dir>=0;
+      d=`<span class="d ${good?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch*100).toFixed(1)}% <span style="color:var(--muted)">vs prior</span></span>`}
+    return`<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div>${d}</div>`}).join('');
+
+  // Trend
+  const g=R<=30?'day':R<=90?'week':'month';
+  $('trendTitle').textContent='Revenue & orders by '+g;
+  const m={};cur.forEach(o=>{const k=bucket(o,g);m[k]??={rev:0,n:0};m[k].n++;if(valid(o))m[k].rev+=o.total});
+  const keys=Object.keys(m).sort();
+  mk('trend',{data:{labels:keys.map(k=>label(k,g)),datasets:[
+    {type:'line',label:'Revenue ($)',data:keys.map(k=>m[k].rev),borderColor:css('--c1'),backgroundColor:css('--c1'),tension:.3,yAxisID:'y',pointRadius:2},
+    {type:'bar',label:'Orders',data:keys.map(k=>m[k].n),backgroundColor:css('--c2')+'66',yAxisID:'y1'}]},
+    options:{...baseOpts(),interaction:{mode:'index',intersect:false},scales:axes({y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{color:css('--muted')}}})}});
+
+  // Status
+  const sts=['delivered','shipped','processing','returned','cancelled'];
+  mk('status',{type:'doughnut',data:{labels:sts,datasets:[{data:sts.map(s=>cur.filter(o=>o.status===s).length),
+    backgroundColor:[css('--c5'),css('--c2'),css('--c3'),css('--c4'),css('--c6')],borderColor:css('--card')}]},options:baseOpts()});
+
+  // Category (uses region filter + range, ignores category filter so bars stay clickable)
+  const catBase=orders.filter(o=>ago(o)<R&&(st.region==='all'||o.region===st.region)&&valid(o));
+  const names=Object.keys(CATS),rv=names.map(c=>catBase.filter(o=>o.cat===c).reduce((s,o)=>s+o.total,0));
+  mk('catChart',{type:'bar',data:{labels:names,datasets:[{label:'Revenue ($)',data:rv,
+    backgroundColor:names.map(c=>st.cat==='all'||st.cat===c?css('--c1'):css('--line'))}]},
+    options:{...baseOpts(),indexAxis:'y',plugins:{legend:{display:false}},scales:axes(),
+      onClick:(_,els)=>{if(!els.length)return;const c=names[els[0].index];st.cat=st.cat===c?'all':c;$('cat').value=st.cat;render()}}});
+
+  // Top products
+  const pm={};cur.filter(valid).forEach(o=>{pm[o.product]??={u:0,r:0,c:o.cat};pm[o.product].u+=o.qty;pm[o.product].r+=o.total});
+  const top=Object.entries(pm).sort((x,y)=>y[1].r-x[1].r).slice(0,6);
+  $('top').innerHTML='<tr><th>Product</th><th>Category</th><th class="n">Units</th><th class="n">Revenue</th></tr>'+
+    (top.map(([n,p])=>`<tr><td>${n}</td><td>${p.c}</td><td class="n">${p.u}</td><td class="n">${usd(p.r)}</td></tr>`).join('')||'<tr><td colspan="4">No data</td></tr>');
+
+  window._cur=cur;renderOrders();
+}
+
+function renderOrders(){
+  let l=(window._cur||[]).filter(o=>!st.q||[o.id,o.product,o.region,o.cat,o.channel,o.status].join(' ').toLowerCase().includes(st.q));
+  const k=st.sort;l=[...l].sort((x,y)=>{const A=k==='date'?x.date:x[k],B=k==='date'?y.date:y[k];return(A>B?1:A<B?-1:0)*st.dir});
+  const cols=[['id','Order'],['date','Date'],['product','Product'],['region','Region'],['channel','Channel'],['status','Status'],['total','Total']];
+  $('orders').innerHTML='<tr>'+cols.map(([k,t])=>`<th data-k="${k}" class="${k==='total'?'n':''}">${t}${st.sort===k?(st.dir>0?' ↑':' ↓'):''}</th>`).join('')+'</tr>'+
+    (l.slice(0,12).map(o=>`<tr><td>${o.id}</td><td>${fmtDate(o.date)}</td><td>${o.product} ×${o.qty}</td><td>${o.region}</td><td>${o.channel}</td><td><span class="badge ${o.status}">${o.status}</span></td><td class="n">${usd(o.total)}</td></tr>`).join('')||'<tr><td colspan="7">No matching orders</td></tr>');
+  $('orders').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k;st.dir=st.sort===k?-st.dir:-1;st.sort=k;renderOrders()});
+}
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+render();
+</script>
+</body>
+</html>
